@@ -32,10 +32,9 @@ COMMON_TOKENS = {
 
 DOMAIN_REGEX = re.compile(r'\.(com|org|net|in|co|fr|gov|edu|biz|info|io)(\.[a-z]{2})?$', re.IGNORECASE)
 PUNCT_REGEX = re.compile(r'[\.\-\_\,\/\:\;\(\)\[\]\<\>\&\"\'\`\+\#\@\*\=\\\~]')
-NUM_REGEX = re.compile(r'\b\d+\b')
 
 def clean_name(raw_name: str):
-    if not raw_name:
+    if not raw_name or str(raw_name).strip().lower() in ('none', 'null', 'nan'):
         return "", set(), ""
     
     s_asc = anyascii.anyascii(str(raw_name)).lower()
@@ -48,15 +47,22 @@ def clean_name(raw_name: str):
     s_clean = PUNCT_REGEX.sub(' ', s_nodom)
     tokens = [w for w in s_clean.split() if len(w) >= 2 and w not in LEGAL_SUFFIXES and w not in COMMON_TOKENS]
     
-    compact = re.sub(r'[^a-z0-9]', '', s_clean)
+    # Build compact string from substantive tokens to avoid prefix collision (e.g. "technologies...")
+    if tokens:
+        compact = "".join(tokens)
+    else:
+        compact = re.sub(r'[^a-z0-9]', '', s_clean)
+        
     return " ".join(tokens), set(tokens), compact
 
 def clean_address(raw_addr: str):
-    if not raw_addr:
+    if not raw_addr or str(raw_addr).strip().lower() in ('none', 'null', 'nan'):
         return "", set(), set(), set()
     
     s_asc = anyascii.anyascii(str(raw_addr)).lower()
-    numbers = set(NUM_REGEX.findall(s_asc))
+    raw_nums = re.findall(r'\d+', s_asc)
+    # Strip leading zeros, e.g. 0017560 -> 17560, 0337 -> 337
+    numbers = set(n.lstrip('0') for n in raw_nums if n.lstrip('0'))
     
     s_clean = PUNCT_REGEX.sub(' ', s_asc)
     tokens = [w for w in s_clean.split() if len(w) >= 3 and w not in ADDR_STOP_WORDS and w not in COMMON_TOKENS]
