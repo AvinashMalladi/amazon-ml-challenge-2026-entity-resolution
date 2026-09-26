@@ -1,0 +1,9 @@
+# Ignore massive datasets & output files
+student_resource/
+dataset/
+*.zip
+output/
+__pycache__/
+*.pyc
+.system_generated/
+*.log

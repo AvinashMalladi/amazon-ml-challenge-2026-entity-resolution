@@ -1,0 +1,20 @@
+{
+  "features": [
+    "jaccard_name",
+    "overlap_name",
+    "fuzz_ratio",
+    "fuzz_token_sort",
+    "fuzz_token_set",
+    "comp_ratio",
+    "comp_contains",
+    "jaccard_addr",
+    "overlap_addr",
+    "addr_ratio",
+    "addr_token_sort",
+    "num_match",
+    "num_conflict",
+    "has_addr_both"
+  ],
+  "optimal_threshold": 0.75,
+  "singleton_threshold": 0.8
+}
