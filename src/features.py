@@ -1,79 +1,67 @@
+"""
+High-Precision Feature Extraction Module for Amazon ML Challenge 2026.
+Computes 14 discriminative pairwise similarity features across name, address, and numbers.
+"""
+
 from rapidfuzz import fuzz
 
 FEATURE_NAMES = [
-    "jaccard_name",
-    "overlap_name",
-    "fuzz_ratio",
-    "fuzz_token_sort",
-    "fuzz_token_set",
+    "jacc_name",
+    "f_ratio",
+    "f_tok_sort",
+    "f_tok_set",
     "comp_ratio",
-    "comp_contains",
-    "jaccard_addr",
-    "overlap_addr",
-    "addr_ratio",
-    "addr_token_sort",
-    "num_match",
-    "num_conflict",
-    "has_addr_both"
+    "comp_match",
+    "first_match",
+    "jacc_addr",
+    "a_ratio",
+    "a_tok_sort",
+    "has_num_match",
+    "has_num_conflict",
+    "has_both_addr",
+    "exact_addr_sole"
 ]
 
-def extract_pairwise_features(s1_data: dict, cand_data: dict):
-    # 1. Name Token Features
-    n1 = s1_data["name_toks"]
-    n2 = cand_data["name_toks"]
-    inter_name = len(n1 & n2)
-    union_name = len(n1 | n2)
+def extract_pairwise_features(s1_d: tuple, td: dict):
+    n1_str, n1_toks, n1_comp, a1_str, a1_toks, a1_nums, a1_compact, is_sole = s1_d
+    n2_str = td["n_str"]
+    n2_toks = td["n_toks"]
+    n2_comp = td["n_comp"]
+    a2_str = td["a_str"]
+    a2_toks = td["a_toks"]
+    a2_nums = td["a_nums"]
+    a2_compact = td["a_compact"]
+    has_both_addr = bool(a1_str and a2_str)
     
-    jaccard_name = inter_name / union_name if union_name > 0 else 0.0
-    overlap_name = inter_name / min(len(n1), len(n2)) if (n1 and n2) else 0.0
+    # 1. Name features
+    jacc_name = len(n1_toks & n2_toks) / len(n1_toks | n2_toks) if (n1_toks or n2_toks) else 0.0
+    f_ratio = fuzz.ratio(n1_str, n2_str) / 100.0 if (n1_str and n2_str) else 0.0
+    f_tok_sort = fuzz.token_sort_ratio(n1_str, n2_str) / 100.0 if (n1_str and n2_str) else 0.0
+    f_tok_set = fuzz.token_set_ratio(n1_str, n2_str) / 100.0 if (n1_str and n2_str) else 0.0
+    comp_ratio = fuzz.ratio(n1_comp, n2_comp) / 100.0 if (n1_comp and n2_comp) else 0.0
+    comp_match = 1.0 if (len(n1_comp) >= 5 and len(n2_comp) >= 5 and (n1_comp in n2_comp or n2_comp in n1_comp)) else 0.0
     
-    # 2. Name String Similarities
-    str1 = s1_data["name_str"]
-    str2 = cand_data["name_str"]
-    fuzz_ratio = fuzz.ratio(str1, str2) / 100.0 if (str1 and str2) else 0.0
-    fuzz_token_sort = fuzz.token_sort_ratio(str1, str2) / 100.0 if (str1 and str2) else 0.0
-    fuzz_token_set = fuzz.token_set_ratio(str1, str2) / 100.0 if (str1 and str2) else 0.0
+    first_match = 0.0
+    if n1_str and n2_str:
+        w1 = n1_str.split()[0]
+        w2 = n2_str.split()[0]
+        if len(w1) >= 4 and w1 == w2:
+            first_match = 1.0
+            
+    # 2. Address features
+    jacc_addr = len(a1_toks & a2_toks) / len(a1_toks | a2_toks) if (has_both_addr and (a1_toks or a2_toks)) else 0.0
+    a_ratio = fuzz.ratio(a1_str, a2_str) / 100.0 if has_both_addr else 0.0
+    a_tok_sort = fuzz.token_sort_ratio(a1_str, a2_str) / 100.0 if has_both_addr else 0.0
     
-    # 3. Compact / Domain Name Features
-    c1 = s1_data["name_comp"]
-    c2 = cand_data["name_comp"]
-    comp_ratio = fuzz.ratio(c1, c2) / 100.0 if (c1 and c2) else 0.0
-    comp_contains = 1.0 if (c1 and c2 and len(c1) >= 5 and len(c2) >= 5 and (c1 in c2 or c2 in c1)) else 0.0
-    
-    # 4. Address Token Features
-    a1 = s1_data["addr_toks"]
-    a2 = cand_data["addr_toks"]
-    has_addr_both = 1.0 if (a1 and a2) else 0.0
-    inter_addr = len(a1 & a2)
-    union_addr = len(a1 | a2)
-    jaccard_addr = inter_addr / union_addr if union_addr > 0 else 0.0
-    overlap_addr = inter_addr / min(len(a1), len(a2)) if (a1 and a2) else 0.0
-    
-    # 5. Address String Similarities
-    astr1 = s1_data["addr_str"]
-    astr2 = cand_data["addr_str"]
-    addr_ratio = fuzz.ratio(astr1, astr2) / 100.0 if (astr1 and astr2) else 0.0
-    addr_token_sort = fuzz.token_sort_ratio(astr1, astr2) / 100.0 if (astr1 and astr2) else 0.0
-    
-    # 6. Numeric / Address Conflict Features
-    nums1 = s1_data["addr_nums"]
-    nums2 = cand_data["addr_nums"]
-    num_match = 1.0 if (nums1 and nums2 and bool(nums1 & nums2)) else 0.0
-    num_conflict = 1.0 if (nums1 and nums2 and not bool(nums1 & nums2)) else 0.0
+    s1_sub_nums = {n for n in a1_nums if len(n) >= 2}
+    t_sub_nums = {n for n in a2_nums if len(n) >= 2}
+    common_sub_nums = s1_sub_nums & t_sub_nums
+    has_num_match = 1.0 if bool(common_sub_nums) else 0.0
+    has_num_conflict = 1.0 if (s1_sub_nums and t_sub_nums and not common_sub_nums) else 0.0
+    exact_addr_sole = 1.0 if (is_sole and a1_compact == a2_compact) else 0.0
     
     return [
-        jaccard_name,
-        overlap_name,
-        fuzz_ratio,
-        fuzz_token_sort,
-        fuzz_token_set,
-        comp_ratio,
-        comp_contains,
-        jaccard_addr,
-        overlap_addr,
-        addr_ratio,
-        addr_token_sort,
-        num_match,
-        num_conflict,
-        has_addr_both
+        jacc_name, f_ratio, f_tok_sort, f_tok_set, comp_ratio, comp_match, first_match,
+        jacc_addr, a_ratio, a_tok_sort, has_num_match, has_num_conflict,
+        1.0 if has_both_addr else 0.0, exact_addr_sole
     ]

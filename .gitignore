@@ -1,0 +1,9 @@
+# Ignore large dataset and submission archives
+student_resource/
+dataset/
+output/
+*.zip
+*.log
+__pycache__/
+*.pyc
+*.bin
